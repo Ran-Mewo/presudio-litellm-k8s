@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "litellm-presidio.fullname" . }}-config
+  labels:
+    {{- include "litellm-presidio.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    model_list:
+    {{- range .Values.litellm.models }}
+      - model_name: {{ .model_name }}
+        litellm_params:
+          {{- toYaml .litellm_params | nindent 10 }}
+    {{- end }}
+
+    guardrails:
+    {{- range .Values.litellm.guardrails }}
+      - guardrail_name: {{ .guardrail_name }}
+        litellm_params:
+          {{- toYaml .litellm_params | nindent 10 }}
+    {{- end }}
+
+    general_settings:
+      master_key: {{ .Values.litellm.masterKey | quote }}
+      # database_url: "sqlite:///litellm.db"
+      
+    litellm_settings:
+      success_callback: ["langfuse"]
+      failure_callback: ["langfuse"]
+      set_verbose: true
+      json_logs: true
+      
+    environment_variables:
+      PRESIDIO_ANALYZER_API_BASE: "http://127.0.0.1:5002"
+      PRESIDIO_ANONYMIZER_API_BASE: "http://127.0.0.1:5001"

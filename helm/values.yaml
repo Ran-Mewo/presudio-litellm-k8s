@@ -1,0 +1,130 @@
+# Default values for litellm-presidio
+replicaCount: 1
+
+image:
+  litellm:
+    repository: ghcr.io/berriai/litellm
+    tag: "main-latest"
+    pullPolicy: IfNotPresent
+  presidioAnalyzer:
+    repository: mcr.microsoft.com/presidio-analyzer
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  presidioAnonymizer:
+    repository: mcr.microsoft.com/presidio-anonymizer
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+nameOverride: ""
+fullnameOverride: ""
+
+service:
+  type: ClusterIP
+  port: 4000
+  targetPort: 4000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: litellm.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Resource limits optimized for minikube with 6GB RAM
+resources:
+  litellm:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  presidioAnalyzer:
+    limits:
+      cpu: 500m
+      memory: 1.5Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+  presidioAnonymizer:
+    limits:
+      cpu: 200m
+      memory: 512Mi
+    requests:
+      cpu: 100m
+      memory: 256Mi
+
+# LiteLLM Configuration
+litellm:
+  # Master key for LiteLLM proxy authentication
+  masterKey: "sk-1234"
+
+  # Model configuration
+  models:
+    - model_name: "gpt-4o-mini"
+      litellm_params:
+        model: "openai/gpt-4o-mini"
+        api_base: "https://api.openai.com/v1"
+        api_key: "<key>"
+  
+  # Presidio guardrails configuration
+  guardrails:
+    - guardrail_name: "presidio-pii-mask"
+      litellm_params:
+        guardrail: "presidio"
+        mode: "pre_call"
+        presidio_language: "en"
+        pii_entities_config:
+          CREDIT_CARD: "MASK"
+          EMAIL_ADDRESS: "MASK"
+          PHONE_NUMBER: "MASK"
+          PERSON: "MASK"
+          LOCATION: "MASK"
+          US_SSN: "MASK"
+          US_DRIVER_LICENSE: "MASK"
+    - guardrail_name: "presidio-pii-block"
+      litellm_params:
+        guardrail: "presidio"
+        mode: "pre_call"
+        presidio_language: "en"
+        pii_entities_config:
+          CREDIT_CARD: "BLOCK"
+          US_SSN: "BLOCK"
+
+# Presidio configuration
+presidio:
+  analyzer:
+    port: 5002
+  anonymizer:
+    port: 5001
+
+# Environment variables
+env:
+  PRESIDIO_ANALYZER_API_BASE: "http://127.0.0.1:5002"
+  PRESIDIO_ANONYMIZER_API_BASE: "http://127.0.0.1:5001"
+  LITELLM_LOG: "INFO"
+  LITELLM_DETAILED_DEBUG: "true"
+
+# Health checks
+healthCheck:
+  enabled: true
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Node selector for minikube
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Security context - ensure it's relaxed for cache directory access
+securityContext: {}
+
+podSecurityContext: {}

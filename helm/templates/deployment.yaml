@@ -1,0 +1,176 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "litellm-presidio.fullname" . }}
+  labels:
+    {{- include "litellm-presidio.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "litellm-presidio.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "litellm-presidio.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      # LiteLLM main container
+      - name: litellm
+        image: "{{ .Values.image.litellm.repository }}:{{ .Values.image.litellm.tag }}"
+        imagePullPolicy: {{ .Values.image.litellm.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 4000
+          protocol: TCP
+        env:
+        {{- range $key, $value := .Values.env }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+        command: ["litellm"]
+        args: 
+        - "--config"
+        - "/app/config/config.yaml"
+        - "--port"
+        - "4000"
+        - "--host"
+        - "0.0.0.0"
+        {{- if .Values.env.LITELLM_DETAILED_DEBUG }}
+        - "--detailed_debug"
+        {{- end }}
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: litellm-cache
+          mountPath: /.cache
+        {{- if .Values.healthCheck.enabled }}
+        livenessProbe:
+          httpGet:
+            path: /health/liveliness
+            port: http
+          initialDelaySeconds: {{ .Values.healthCheck.initialDelaySeconds }}
+          periodSeconds: {{ .Values.healthCheck.periodSeconds }}
+          timeoutSeconds: {{ .Values.healthCheck.timeoutSeconds }}
+          failureThreshold: {{ .Values.healthCheck.failureThreshold }}
+        readinessProbe:
+          httpGet:
+            path: /health/readiness
+            port: http
+          initialDelaySeconds: 15
+          periodSeconds: 5
+          timeoutSeconds: {{ .Values.healthCheck.timeoutSeconds }}
+        {{- end }}
+        {{- with .Values.resources.litellm }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+
+      # Presidio Analyzer sidecar
+      - name: presidio-analyzer
+        image: "{{ .Values.image.presidioAnalyzer.repository }}:{{ .Values.image.presidioAnalyzer.tag }}"
+        imagePullPolicy: {{ .Values.image.presidioAnalyzer.pullPolicy }}
+        ports:
+        - name: analyzer
+          containerPort: 5002
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "5002"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5002
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5002
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: presidio-analyzer-cache
+          mountPath: /.cache
+        {{- with .Values.resources.presidioAnalyzer }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+
+      # Presidio Anonymizer sidecar
+      - name: presidio-anonymizer
+        image: "{{ .Values.image.presidioAnonymizer.repository }}:{{ .Values.image.presidioAnonymizer.tag }}"
+        imagePullPolicy: {{ .Values.image.presidioAnonymizer.pullPolicy }}
+        ports:
+        - name: anonymizer
+          containerPort: 5001
+          protocol: TCP
+        env:
+        - name: PORT
+          value: "5001"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 5001
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 5001
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: presidio-anonymizer-cache
+          mountPath: /.cache
+        {{- with .Values.resources.presidioAnonymizer }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- with .Values.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "litellm-presidio.fullname" . }}-config
+      - name: litellm-cache
+        emptyDir: {}
+      - name: presidio-analyzer-cache
+        emptyDir: {}
+      - name: presidio-anonymizer-cache
+        emptyDir: {}
+
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

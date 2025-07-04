@@ -1,0 +1,22 @@
+apiVersion: v2
+name: litellm-presidio
+description: A Helm chart for LiteLLM with Presidio PII masking sidecars
+type: application
+version: 0.1.0
+appVersion: "latest"
+keywords:
+  - litellm
+  - presidio
+  - pii
+  - ai
+  - llm
+  - privacy
+home: https://github.com/BerriAI/litellm
+sources:
+  - https://github.com/BerriAI/litellm
+  - https://github.com/microsoft/presidio
+maintainers:
+  - name: LiteLLM Team
+    url: https://github.com/BerriAI/litellm
+  - name: Microsoft Presidio Team
+    url: https://github.com/microsoft/presidio
