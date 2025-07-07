@@ -1,0 +1,16 @@
+{{- if .Values.oauth.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "litellm-presidio.fullname" . }}-oauth-files
+  labels:
+    {{- include "litellm-presidio.labels" . | nindent 4 }}
+data:
+{{- range $path, $_ := .Files.Glob "oauth/**" }}
+  {{- if not (hasSuffix "/" $path) }}
+  # Create a valid key by replacing path separators. e.g., "oauth/providers/github.py" -> "oauth__providers__github.py"
+  {{ $path | replace "/" "__" | nindent 2 }}: |-
+{{ $.Files.Get $path | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}

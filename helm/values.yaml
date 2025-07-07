@@ -39,10 +39,10 @@ resources:
   litellm:
     limits:
       cpu: 1000m
-      memory: 2Gi
+      memory: 1Gi
     requests:
       cpu: 500m
-      memory: 1Gi
+      memory: 512Mi
   presidioAnalyzer:
     limits:
       cpu: 500m
@@ -101,6 +101,13 @@ presidio:
     port: 5002
   anonymizer:
     port: 5001
+
+# OAuth Configuration
+oauth:
+  enabled: true
+  provider: "github"
+  github:
+    apiBase: "https://api.github.com"
 
 # Environment variables
 env:

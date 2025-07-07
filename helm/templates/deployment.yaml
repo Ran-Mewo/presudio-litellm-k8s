@@ -18,6 +18,16 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if .Values.oauth.enabled }}
+      initContainers:
+      - name: install-oauth-deps
+        image: "{{ .Values.image.litellm.repository }}:{{ .Values.image.litellm.tag }}"
+        command: ["pip", "install", "-r", "/app/config/oauth/requirements.txt"]
+        volumeMounts:
+        - name: oauth-files
+          mountPath: /app/config/oauth
+          readOnly: true
+      {{- end }}
       containers:
       # LiteLLM main container
       - name: litellm
@@ -31,6 +41,20 @@ spec:
         {{- range $key, $value := .Values.env }}
         - name: {{ $key }}
           value: {{ $value | quote }}
+        {{- end }}
+        {{- if .Values.oauth.enabled }}
+        - name: PYTHONPATH
+          value: "/app/config:${PYTHONPATH}"
+        - name: OAUTH_ENABLED
+          value: "true"
+        - name: OAUTH_PROVIDER
+          value: {{ .Values.oauth.provider | quote }}
+        {{- $provider := .Values.oauth.provider }}
+        {{- $providerConfig := index .Values.oauth $provider }}
+        {{- range $key, $value := $providerConfig }}
+        - name: OAUTH_{{ $provider | upper }}_{{ $key | upper }}
+          value: {{ $value | quote }}
+        {{- end }}
         {{- end }}
         command: ["litellm"]
         args: 
@@ -49,6 +73,11 @@ spec:
           readOnly: true
         - name: litellm-cache
           mountPath: /.cache
+        {{- if .Values.oauth.enabled }}
+        - name: oauth-files
+          mountPath: /app/config/oauth
+          readOnly: true
+        {{- end }}
         {{- if .Values.healthCheck.enabled }}
         livenessProbe:
           httpGet:
@@ -161,6 +190,20 @@ spec:
         emptyDir: {}
       - name: presidio-anonymizer-cache
         emptyDir: {}
+      {{- if .Values.oauth.enabled }}
+      - name: oauth-files
+        configMap:
+          name: {{ include "litellm-presidio.fullname" . }}-oauth-files
+          # Use 'items' to map each key in the ConfigMap to a specific file path,
+          # which reconstructs the original directory structure inside the volume.
+          items:
+          {{- range $path, $_ := .Files.Glob "oauth/**" }}
+            {{- if not (hasSuffix "/" $path) }}
+            - key: {{ $path | replace "/" "__" }}
+              path: {{ $path | trimPrefix "oauth/" }}
+            {{- end }}
+          {{- end }}
+      {{- end }}
 
       {{- with .Values.nodeSelector }}
       nodeSelector:

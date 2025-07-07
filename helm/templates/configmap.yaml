@@ -21,7 +21,11 @@ data:
     {{- end }}
 
     general_settings:
+      {{- if .Values.oauth.enabled }}
+      custom_auth: oauth.auth.user_api_key_auth
+      {{- else }}
       master_key: {{ .Values.litellm.masterKey | quote }}
+      {{- end }}
       # database_url: "sqlite:///litellm.db"
       
     litellm_settings:
